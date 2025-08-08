@@ -32,7 +32,7 @@ def read_data_from_file(filename):
             data[key] = value
     return data
 
-def read_num()
+
 
 def crc16(data):
     crc = 0xFFFF
@@ -103,7 +103,7 @@ def parse_light_data(data):
         print("Not Full value")
         return None
     
-# -------- Motor and Sensors --------
+# -------- Motor and Sensors detect --------
 motor_r = PWM(Pin(26), freq=1000)
 motor_l = PWM(Pin(27), freq=1000)
 
@@ -122,44 +122,181 @@ def motor_right(speed=512):
     motor_r.duty(0)
     motor_l.duty(speed)
     
+# === ฟังชันปั๊ม ===
+
+pump_pwm_pin = Pin(12, Pin.OUT)
+pump_pwm = PWM(pump_pwm_pin)
+pump_pwm.freq(1000)
+
+def read_power():       
+    num = ""    
+    while True:
+        key = scan_keypad()
+        if key is not None :         
+            if key >= '0' and key <= '9' and len(num) < 3:               
+                num = num + key
+                lcd.clear()
+                lcd.putstr(f"Enter Power:{num}")
+            elif key == '#':
+                lcd.putstr("")                
+                return int(num)
+            elif key == '*':
+                num = ""
+                print("Enter Power: ", end="")
+
+def map_value(value, in_min, in_max, out_min, out_max):
+    return (value - in_min) * (out_max - out_min) // (in_max - in_min) + out_min
+
+def read_pump_Power():
+    lcd.clear()
+    lcd.putstr("Enter Pump Power: ")
+    power_in = read_power()
+    print(f"PowerIn: {power_in}")
+    if 0 <= power_in <= 100:
+        pump_power = map_value(power_in, 0, 100, 0, 1023)
+        print(f"PowerOut: {pump_power}")
+        lcd.clear()
+        lcd.putstr(f"Pump Power: {power_in}%")
+    else:
+        lcd.clear()
+        lcd.putstr("No Value")
+    return pump_power
+
+# === ฟังชันเลือกโหมดควบคุม ===
+def select_control_mode_motor():
+    global control_mode
+    lcd.clear()
+    lcd.putstr("Select Mode:")
+    lcd.move_to(0, 1)
+    lcd.putstr("1.Manual 2.Timer 3.Timer + light")
+    
+    while True:
+        key = scanKeypad()
+        sleep(0.3)
+        if key == "1":
+            control_mode = "Manual"
+            lcd.clear()
+            lcd.putstr("Mode: Manual")
+            sleep(1)
+            break
+        elif key == "2":
+            control_mode = "Timer"
+            lcd.clear()
+            lcd.putstr("Mode: Timer")
+            sleep(1)
+            break
+        elif key == "3":
+            control_mode = "Light"
+            lcd.clear()
+            lcd.putstr("Mode: Light Controll")
+            sleep(1)
+            break
+        if key == "#":
+            break
+    return control_mode_motor
+
+def select_control_mode_pump():
+    global control_mode
+    lcd.clear()
+    lcd.putstr("Select Mode:")
+    lcd.move_to(0, 1)
+    lcd.putstr("1.Manual 2.Timer 3.Timer + Humid")
+    
+    while True:
+        key = scanKeypad()
+        sleep(0.3)
+        if key == "1":
+            control_mode = "Manual"
+            lcd.clear()
+            lcd.putstr("Mode: Manual")
+            sleep(1)
+            break
+        elif key == "2":
+            control_mode = "Timer"
+            lcd.clear()
+            lcd.putstr("Mode: Timer")
+            sleep(1)
+            break
+        elif key == "3":
+            control_mode = "Humid"
+            lcd.clear()
+            lcd.putstr("Mode: Humid Controll")
+            sleep(1)
+            break
+        if key == "#":
+            break
+    return control_mode
+
 # === ฟังก์ชันควบคุมการทำงานม่านและปั๊ม ===
 def devControl():
-    global startTime1, stopTime1, startTime2, stopTime2, motorStatus, pumpStatus, timerState, currTime
+    global startTime1, stopTime1, startTime2, stopTime2, motorState, pumpState, currTime
     active1 = startTime1 <= currTime <= stopTime1
     active2 = startTime2 <= currTime <= stopTime2
 
-    if timerMotorState:
+    if mode =
+    if motorCon:
             if active1 and motorState:
-                if motorStatus != "On":
                     lcd.clear()
                     lcd.putstr("Motor On")
-                    motorStatus = "On"
-                    lcdCleared = True
+                    motor_left()
+                    while True:
+                        s1 = sensor1.value()
+                        s2 = sensor2.value()
+                        lcd.move_to(0, 1)
+                        lcd.putstr("Motor Close")
+                        if s1 == 1 and s2 == 0:
+                            stop_motor()
+                            lcd.clear()
+                            lcd.putstr("Moter stop")
+                            break
+                        sleep(0.1)
+
             else:
                 if motorStatus != "Off":
                     lcd.clear()
-                    lcd.putstr("Motor Off")
-                    motorStatus = "Off"
-                    lcdCleared = True
+                    lcd.putstr("Motor Close")
+                    motor_right()
+                    while True:
+                        s1 = sensor1.value()
+                        s2 = sensor2.value()
+                        lcd.move_to(0, 1)
 
-    if timerPumpState:
+                        if s2 == 1 and s1 == 0:
+                            stop_motor()
+                            lcd.clear()
+                            lcd.putstr("Motor Stop")
+                            break
+                        sleep(0.1)
+
+    if pumpCon:
             if active2 and pumpState:
                 if pumpStatus != "On":
                     lcd.clear()
                     lcd.putstr("Pump On")
-                    pumpStatus = "On"
-                    lcdCleared = True
+                    pump_pwm.duty(pump_power)
             else:
                 if pumpStatus != "Off":
                     lcd.clear()
                     lcd.putstr("Pump Off")
-                    pumpStatus = "Off"
-                    lcdCleared = True
+                    pump_pwm.duty(0)
+
+                    
+def deviceStateCheck():
+    if light_value >= float(start_light) and light_value <= float(stop_light):
+        motorState = True
+    else:
+        motorState = False
+
+    
+    if humid_d >= float(start_humid_d) and humid_d <= float(stop_humid_d):
+        pumpState = True
+    else:
+        pumpState = False
     
 
 
 # === ฟังก์ชันหลักที่รวมการอ่านทั้งหมด ===
-def read_all_sensors_and_save():
+def read_all_sensors():
     
     req_byh = [2, 3, 0, 0, 0, 2]
     raw1 = send_modbus_request(req_byh)
@@ -224,11 +361,10 @@ def check_device_status():
     
 def show_wifi_info():
     try:
-        with open("datapae.txt", "r") as f:
+        with open("data1.txt", "r") as f:
             line = f.readline().strip()
             ssid, password = line.split(",")  # แยก SSID และ Password
 
-        # แสดงบน LCD (2 บรรทัด)
         lcd.clear()
         lcd.putstr("SSID: " + ssid)
         lcd.move_to(0, 1)
@@ -239,8 +375,8 @@ def show_wifi_info():
         if lcd_ready:
             lcd.clear()
             lcd.putstr("Read Error")
-    
-def keypad_com():
+
+def operation_esp32_comm():
     lcd.clear()
     lcd.putstr("Select:1-14")
     while True:
@@ -279,6 +415,7 @@ def keypad_com():
         elif key == '11':
             exitfunction()
         elif key == '12':
+            read_pump_Power()
             exitfunction()
         elif key == '13':
             
@@ -293,12 +430,9 @@ def keypad_com():
         sleep(0.1)
     
 def exitfunction():
-    lcd.move_to(0, 1)
-    lcd.putstr("Press B to back")
     while True:
         key = scan_keypad()
         if key == 'B':
-            select_function()
             break
         sleep(0.1)
         
@@ -307,17 +441,8 @@ while True:
     
     temp1,humi1,light_value,humid2 = read_all_sensors_and_save()
     
-    keypad_com()
+    operation_esp32_comm()
     
     
     
-    if light_value >= float(startlight) and light_value <= float(stoplight):
-        motorState = True
-    else:
-        motorState = False
 
-    
-    if humid2 >= float(startHumid) and humid2 <= float(stopHumid):
-        pumpState = True
-    else:
-        pumpState = False
