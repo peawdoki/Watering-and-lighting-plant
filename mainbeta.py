@@ -1,5 +1,4 @@
-from machine import UART, Pin,PWM
-import uasyncio as asyncio
+from machine import UART, Pin, PWM
 from time import ticks_ms,sleep
 from machine import SoftI2C
 from lcd_api import LcdApi
@@ -40,8 +39,8 @@ SSID = 'LAPTOP-R0A00K9B 7400'
 PASSWORD = 'U5r04*35'
 FIREBASE_URL = 'https://test-dcf94-default-rtdb.asia-southeast1.firebasedatabase.app/'
 
-data_control = ['0','0','0','0','0',False,False,'0','0','0','0',False,False,'0','0','0','0','LAPTOP-R0A00K9B 7400','U5r04*35']
-            #    0   1   2   3   4   5      6    7   8   9   10  11    12    13  14  15  16   17                          18
+data_control = ['0','0','0','0','0',False,False,'0','0','0','0',False,False,'0','0','0','0','LAPTOP-R0A00K9B 7400','U5r04*35','500']
+            #    0   1   2   3   4   5      6    7   8   9   10  11    12    13  14  15  16   17                          18   19
 # Keypad Setup
 keys = [['1','2','3','A'],
         ['4','5','6','B'],
@@ -209,6 +208,8 @@ def read_pump_Power():
     else:
         lcd.clear()
         lcd.putstr("No Value")
+    file_operation("w")
+    pump_power = data_control[19]
     return pump_power
 
 # === ฟังชันเลือกโหมดควบคุม ===
@@ -440,9 +441,12 @@ def read_all_sensors():
     temp1, humi1 = parse_two_values(raw1)
     if temp1 is not None:
         print("Temp: {:.1f} °C, Humidity: {:.1f} %".format(temp1, humi1))
+        data_control[0] = str(temp1)
     else:
         print("Read SN-300-BYH Fail")
     sleep(1)
+    file_operation('w')
+    
 
     req_ecth = [1, 3, 0, 0, 0, 3]
     raw2 = send_modbus_request(req_ecth)
@@ -481,9 +485,9 @@ def check_device_status():
     raw3 = send_modbus_request(req_light)
     light_value = parse_light_data(raw3)
     lux_status = "ON" if light_value is not None else "OFF"
-
-    motor_status = "ON" if motor_pin.value() else "OFF"
-    pump_status = "ON" if pump_pin.value() else "OFF"
+    
+    motor_status = "ON" if (motor_l.duty() > 0 or motor_r.duty() > 0) else "OFF"
+    pump_status = "ON" if pump_pwm_pin.value() else "OFF"
 
     print("\n=== Device Status ===")
     print("SN-300BYH: {} | SN-3000-ECTH: {} | PR-300BYH-LUX: {} | MOTOR: {} | PUMP: {}".format(
@@ -503,6 +507,8 @@ def show_wifi_info():
     lcd.move_to(0, 1)
     lcd.putstr("Key: " + data_control[18])
 
+
+    
     
     
 
@@ -518,41 +524,47 @@ def operation_esp32_comm():
             check_device_status()
             exitfunction()
         elif key == '2':
+            lcd.clear()
             lcd.putstr("Air Temp and Humid")
-            lcd.putstr("Temp: {temp1}C, Humidity: {humi1}%")
+            lcd.move_to(0, 1)
+            lcd.putstr("Temp: " + str(temp1) + "C Humid: " + str(humi1) + "%")
             exitfunction()
         elif key == '3':
+            lcd.clear()
             lcd.putstr("Dirt Humid")
-            lcd.putstr("Humidity: {humi2}%")
+            lcd.move_to(0, 1)
+            lcd.putstr("Humidity: " + str(humi2) + "%")
             exitfunction()
         elif key == '4':
+            lcd.clear()
             lcd.putstr("Light Intensity")
-            lcd.putstr("Intensity: {light_value} lux")
+            lcd.move_to(0, 1)
+            lcd.putstr("Intensity: " + str(light_value) + " lux")
             exitfunction()
         elif key == '5':
             show_wifi_info()
             exitfunction()
         elif key == '6':
-            select_control_mode_motor()
+            connect_wifi()
             exitfunction()
         elif key == '7':
-            select_control_mode_pump()
+            select_control_mode_motor()
             exitfunction()
         elif key == '8':
+            select_control_mode_pump()
             motorState = not motorState
-            lcd.putstr("Motor")
             exitfunction()
         elif key == '9':
-            pumpState = not pumpState
+            motorState = not motorState
             exitfunction()
         elif key == '10':
-            read_light_threshold()
+            pumpState = not pumpState
             exitfunction()
         elif key == '11':
-            read_humid_threshold()
+            read_light_threshold()
             exitfunction()
         elif key == '12':
-            
+            read_humid_threshold()
             exitfunction()
         elif key == '13':
             
@@ -562,7 +574,7 @@ def operation_esp32_comm():
             exitfunction()
         else:
             lcd.clear()
-            lcd.putstr("please enter 1-14")
+            lcd.putstr("1-14")
             
         sleep(1)
     
@@ -573,8 +585,8 @@ def exitfunction():
             break
         sleep(0.1)
         
-while True:   
-    temp1,humi1,light_value,humi2 = read_all_sensors()
+while True:
+    temp1,humi1,light_value,humid2 = read_all_sensors()
     operation_esp32_comm()
 
     
