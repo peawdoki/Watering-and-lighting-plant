@@ -1,13 +1,57 @@
-from machine import UART, Pin
+from machine import UART, Pin,PWM
 import uasyncio as asyncio
 from time import ticks_ms,sleep
+from machine import SoftI2C
+from lcd_api import LcdApi
+from i2c_lcd import I2cLcd
 
 # === กำหนดขา DE/RE สำหรับ MAX485 ===
 de = Pin(18, Pin.OUT)
 re = Pin(5, Pin.OUT)
 
+# LCD Setup
+I2C_ADDR = 0x27
+totalRows = 2
+totalColumns = 16
+i2c = SoftI2C(scl=Pin(22), sda=Pin(21), freq=10000)
+lcd = I2cLcd(i2c, I2C_ADDR, totalRows, totalColumns)
+
 # === กำหนด UART2 ===
 uart2 = UART(2, baudrate=4800, tx=17, rx=16, bits=8, parity=None, stop=1)
+
+# === เชื่อมต่อ WiFi ===
+def connect_wifi(ssid, password, timeout=15):
+    wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
+    if not wlan.isconnected():
+        print('Connecting to WiFi...')
+        wlan.connect(ssid, password)
+        start = time.time()
+        while not wlan.isconnected():
+            if time.time() - start > timeout:
+                print('WiFi connection timeout')
+                return False
+            time.sleep(1)
+    print('WiFi connected:', wlan.ifconfig()[0])
+    return True
+
+# === Firebase ===
+SSID = 'LAPTOP-R0A00K9B 7400'
+PASSWORD = 'U5r04*35'
+FIREBASE_URL = 'https://test-dcf94-default-rtdb.asia-southeast1.firebasedatabase.app/'
+
+data_control = ['0','0','0','0','0',False,False,'0','0','0','0',False,False,'0','0','0','0','LAPTOP-R0A00K9B 7400','U5r04*35']
+            #    0   1   2   3   4   5      6    7   8   9   10  11    12    13  14  15  16   17                          18
+# Keypad Setup
+keys = [['1','2','3','A'],
+        ['4','5','6','B'],
+        ['7','8','9','C'],
+        ['*','0','#','D']]
+
+# Define rows and columns for keypad
+rows = [Pin(i, Pin.OUT) for i in (33,25,14,13)]  # Rows R1-R4
+cols = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in (15,2,4,23)]  # Columns C1-C4
+
 
 def scan_keypad():
     for row in range(4):
@@ -19,18 +63,23 @@ def scan_keypad():
                 return keys[row][col]
     return None
 
-def write_data_to_file(data):
-    with open('data.txt', 'w') as f:
-        for key, value in data.items():
-            f.write(f"{key}:{value}\n")
+def file_operation(mode):
+    global data_control
+    
+    f = open('data1.txt', mode)
+    if mode == 'r':
+        data_str = f.readline()
+        data_str = data_str[:len(data_str) - 1]    
+        data_control = data_str.split(",")
+    elif mode == 'w':
+        data_str = ""     
+        for x in data_control:
+           data_str = data_str + str(x) + ','  # แปลง x เป็น string ก่อนเชื่อม
+        data_str = data_str[:-1]
+        data_str = data_str + '\n'     
+        f.write(data_str)
+    f.close()
 
-def read_data_from_file(filename):
-    data = {}
-    with open(filename, 'r') as f:
-        for line in f:
-            key, value = line.strip().split(':')
-            data[key] = value
-    return data
 
 
 
@@ -286,10 +335,10 @@ def devControl():
         if active:
             if humid_d < start_humid and pumpStatus != "On":
                 pump_pwm.duty(pump_power)
-                    sleep(0.1)
+                   # sleep(0.1)
             elif light_value > stop_light and motorStatus != "Off":
                 pump_pwm.duty(0)
-                    sleep(0.1)
+                   # sleep(0.1)
             
 def read_light_threshold():
     global start_light, stop_light
@@ -413,7 +462,7 @@ def read_all_sensors():
         print("Read PR-300BYH-LUX Fail")
     sleep(3)
     
-    return temp1,humi1,light_value,humid2
+    return temp1,humi1,light_value,humi2
 
 
 
@@ -448,29 +497,25 @@ def check_device_status():
 
     
 def show_wifi_info():
-    try:
-        with open("datapae.txt", "r") as f:
-            line = f.readline().strip()
-            ssid, password = line.split(",")  # แยก SSID และ Password
+    file_operation('r')
+    lcd.clear()
+    lcd.putstr("SSID: " + data_control[17])
+    lcd.move_to(0, 1)
+    lcd.putstr("Key: " + data_control[18])
 
-        lcd.clear()
-        lcd.putstr("SSID: " + ssid)
-        lcd.move_to(0, 1)
-        lcd.putstr("Key: " + password)
-
-    except Exception as e:
-        print("Error reading datapae.txt:", e)
-        if lcd_ready:
-            lcd.clear()
-            lcd.putstr("Read Error")
+    
+    
 
 def operation_esp32_comm():
+    global pumpState,motorState
     lcd.clear()
     lcd.putstr("Select:1-14")
     while True:
         key = scan_keypad()
+        if not key:
+            return
         if key == '1':
-            check_device_status
+            check_device_status()
             exitfunction()
         elif key == '2':
             lcd.putstr("Air Temp and Humid")
@@ -504,7 +549,7 @@ def operation_esp32_comm():
             read_light_threshold()
             exitfunction()
         elif key == '11':
-            read_humid_threshold():
+            read_humid_threshold()
             exitfunction()
         elif key == '12':
             
@@ -516,10 +561,10 @@ def operation_esp32_comm():
             read_pump_Power()
             exitfunction()
         else:
-            lcd.clear
+            lcd.clear()
             lcd.putstr("please enter 1-14")
             
-        sleep(0.1)
+        sleep(1)
     
 def exitfunction():
     t = ticks_ms()
@@ -528,13 +573,10 @@ def exitfunction():
             break
         sleep(0.1)
         
-while True:
-    
-    temp1,humi1,light_value,humid2 = read_all_sensors_and_save()
-    
+while True:   
+    temp1,humi1,light_value,humi2 = read_all_sensors()
     operation_esp32_comm()
-    
-    devControl()
+
     
     
     
