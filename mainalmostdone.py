@@ -295,25 +295,29 @@ def select_control_mode_pump():
 # === ฟังก์ชันควบคุมการทำงานม่านและปั๊ม ===
 def devControl():
     global data_control
+    datetime1 = ds.datetime()
+    currTime = datetime1[4]*3600 + datetime1[5]*60 + datetime1[6]
+    start_time_motor = data_control[1]*3600 + data_control[2]*60 + data_control[3]
+    stop_time_motor = data_control[4]*3600 + data_control[5]*60 + data_control[6]
+    start_time_pump = data_control[8]*3600 + data_control[8]*60 + data_control[10]
+    stop_time_pump = data_control[11]*3600 + data_control[12]*60 + data_control[13]
     # Motor Control
     if data_control[1] == "1":  # Manual
-        if motorState and motorStatus != "On":
+        if data_control[15] and data_control[14] != "On":
             motor_left()
             while not check_motor_sensors_for_open():  # รอจนม่านเปิดสุด
                 sleep(0.1)
-            print("MotorState →", motorState)
         elif not motorState and motorStatus != "Off":
             stop_motor()
             while not check_motor_sensors_for_close():  # รอจนม่านเปิดสุด
                 sleep(0.1)
-            print("MotorState →", motorState)
     elif data_control[1] == "2":  # Timer
         active = start_time_motor <= currTime <= stop_time_motor
-        if active and motorStatus != "On":
+        if active and data_control[14] != "On":
             motor_left()
             while not check_motor_sensors_for_open():
                 sleep(0.1)
-        elif not active and motorStatus != "Off":
+        elif not active and data_control[14] != "Off":
             motor_right()
             while not check_motor_sensors_for_close():  # รอจนม่านเปิดสุด
                 sleep(0.1)
@@ -321,11 +325,11 @@ def devControl():
         active = start_time_motor <= currTime <= stop_time_motor
 
         if active:
-            if light_value < start_light and motorStatus != "On":
+            if light_value < data_control[18] and data_control[14] != "On":
                 motor_left() 
                 while not check_motor_sensors_for_open():  # รอจนม่านเปิดสุด
                     sleep(0.1)
-            elif light_value > stop_light and motorStatus != "Off":
+            elif light_value > data_control[19] and data_control[14] != "Off":
                 motor_right()  
                 while not check_motor_sensors_for_close():  # รอจนม่านปิดสนิท
                     sleep(0.1)
