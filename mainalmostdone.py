@@ -51,20 +51,7 @@ keys = [['1','2','3','A'],
 rows = [Pin(i, Pin.OUT) for i in (33,25,14,13)]  # Rows R1-R4
 cols = [Pin(i, Pin.IN, Pin.PULL_DOWN) for i in (15,2,4,23)]  # Columns C1-C4
 
-# currTime        = data_control[4]
-# motorStatus     = data_control[5]
-# motorState      = data_control[6]
-# start_time_motor = data_control[7]
-# stop_time_motor  = data_control[8]
-# start_light     = data_control[9]
-# stop_light      = data_control[10]
-# pumpStatus      = data_control[11]
-# pumpState       = data_control[12]
-# start_time_pump = data_control[13]
-# stop_time_pump  = data_control[14]
-# humid_threshold = data_control[3]   
-# light_value     = data_control[2]   
-# humid_value     = data_control[1]
+
 
 
 def scan_keypad():
@@ -76,6 +63,29 @@ def scan_keypad():
             if cols[col].value() == 1:
                 return keys[row][col]
     return None
+
+
+def read_multi_digit(max_value=9, x=0, y=0):
+    num_str = ""
+    lcd.move_to(x, y)
+    while True:
+        key = scan_keypad()
+        if key:
+            if key.isdigit():
+                num_str += key
+                lcd.putstr(key)
+            elif key == '#':  # กดยืนยัน
+                if num_str == "":
+                    return -1
+                val = int(num_str)
+                if 0 <= val <= max_value:
+                    return val
+                else:
+                    return -1
+            elif key == '*':  # ยกเลิก
+                return -1
+        time.sleep(0.1)
+
 
 def file_operation(mode):
     global data_control
@@ -258,10 +268,12 @@ def select_control_mode_motor():
             break
         if key == "#":
             break
-    return data_control[1]
+        file_operation('w')
+
+    return
 
 def select_control_mode_pump():
-    global data_control[7]
+    global data_control
     lcd.clear()
     lcd.putstr("Select Mode:")
     lcd.move_to(0, 1)
@@ -290,65 +302,79 @@ def select_control_mode_pump():
             break
         if key == "#":
             break
-    return data_control[7]
+        file_operation('w')
+
+    return 
 
 # === ฟังก์ชันควบคุมการทำงานม่านและปั๊ม ===
-def devControl():
-    global data_control
+def devControl(light_value, humid2):
     datetime1 = ds.datetime()
     currTime = datetime1[4]*3600 + datetime1[5]*60 + datetime1[6]
+
+    # Motor times
     start_time_motor = data_control[1]*3600 + data_control[2]*60 + data_control[3]
-    stop_time_motor = data_control[4]*3600 + data_control[5]*60 + data_control[6]
-    start_time_pump = data_control[8]*3600 + data_control[8]*60 + data_control[10]
-    stop_time_pump = data_control[11]*3600 + data_control[12]*60 + data_control[13]
-    # Motor Control
-    if data_control[1] == "1":  # Manual
-        if data_control[15] and data_control[14] != "On":
-            motor_left()
-            while not check_motor_sensors_for_open():  # รอจนม่านเปิดสุด
-                sleep(0.1)
-        elif not motorState and motorStatus != "Off":
-            stop_motor()
-            while not check_motor_sensors_for_close():  # รอจนม่านเปิดสุด
-                sleep(0.1)
-    elif data_control[1] == "2":  # Timer
-        active = start_time_motor <= currTime <= stop_time_motor
-        if active and data_control[14] != "On":
+    stop_time_motor  = data_control[4]*3600 + data_control[5]*60 + data_control[6]
+
+    # Pump times
+    start_time_pump = data_control[8]*3600 + data_control[9]*60 + data_control[10]
+    stop_time_pump  = data_control[11]*3600 + data_control[12]*60 + data_control[13]
+
+    # ----------------- Motor Control -----------------
+    if data_control[0] == 1:  # Manual
+        if data_control[15] and not data_control[14]:
             motor_left()
             while not check_motor_sensors_for_open():
                 sleep(0.1)
-        elif not active and data_control[14] != "Off":
-            motor_right()
-            while not check_motor_sensors_for_close():  # รอจนม่านเปิดสุด
+        elif not data_control[15] and data_control[14]:
+            stop_motor()
+            while not check_motor_sensors_for_close():
                 sleep(0.1)
-    elif data_control[1] == "3":  # Light
+
+    elif data_control[0] == 2:  # Timer
         active = start_time_motor <= currTime <= stop_time_motor
+        if active and not data_control[14]:
+            motor_left()
+            while not check_motor_sensors_for_open():
+                sleep(0.1)
+        elif not active and data_control[14]:
+            motor_right()
+            while not check_motor_sensors_for_close():
+                sleep(0.1)
 
+    elif data_control[0] == 3:  # Light
+        active = start_time_motor <= currTime <= stop_time_motor
         if active:
-            if light_value < data_control[18] and data_control[14] != "On":
-                motor_left() 
-                while not check_motor_sensors_for_open():  # รอจนม่านเปิดสุด
+            if light_value < data_control[18] and not data_control[14]:
+                motor_left()
+                while not check_motor_sensors_for_open():
                     sleep(0.1)
-            elif light_value > data_control[19] and data_control[14] != "Off":
-                motor_right()  
-                while not check_motor_sensors_for_close():  # รอจนม่านปิดสนิท
+            elif light_value > data_control[19] and data_control[14]:
+                motor_right()
+                while not check_motor_sensors_for_close():
                     sleep(0.1)
 
-    if data_control[7] == "1":  # Manual
-        if pumpState and pumpStatus != "On":
-            pump_pwm.duty(pump_power)
-            print("PumpState →", pumpState)
-        elif not pumpState and pumpStatus != "Off":
+    # ----------------- Pump Control -----------------
+    if data_control[7] == 1:  # Manual
+        if data_control[17] and not data_control[16]:
+            pump_pwm.duty(data_control[22])
+        elif not data_control[17] and data_control[16]:
             pump_pwm.duty(0)
-            print("PumpState →", pumpState)
-    elif data_control[7] == "2":  # Timer
+
+    elif data_control[7] == 2:  # Timer
         active = start_time_pump <= currTime <= stop_time_pump
-        if active and pumpStatus != "On":
-            pump_pwm.duty(pump_power)
-        elif not active and pumpStatus != "Off":
+        if active and not data_control[16]:
+            pump_pwm.duty(data_control[22])
+        elif not active and data_control[16]:
             pump_pwm.duty(0)
-    elif data_control[7] == "3":  # Humid
+
+    elif data_control[7] == 3:  # Humid
         active = start_time_pump <= currTime <= stop_time_pump
+        if active:
+            if humid2 < data_control[20] and not data_control[16]:
+                pump_pwm.duty(data_control[22])
+            elif humid2 > data_control[21] and data_control[16]:
+                pump_pwm.duty(0)
+
         
 def check_motor_sensors_for_close():
     s1 = sensor1.value()
@@ -367,12 +393,11 @@ def check_motor_sensors_for_open():
     return False
             
 def read_light_threshold():
-    global start_light, stop_light
     lcd.clear()
     lcd.putstr("1:Start 2:Stop")
     while True:
         key = scanKeypad()
-        if key == "1" or key == "2":
+        if key in ["1", "2"]:
             lcd.clear()
             if key == "1":
                 lcd.putstr("Set Start Light")
@@ -386,9 +411,9 @@ def read_light_threshold():
                         val = int(val_str)
                         if 0 <= val <= 200000:
                             if key == "1":
-                                start_light = val
+                                data_control[18] = val
                             else:
-                                stop_light = val
+                                data_control[19] = val
                             lcd.clear()
                             lcd.putstr(f"Value set: {val}")
                             print(f"{'Start' if key=='1' else 'Stop'} Light set to {val} lux")
@@ -410,13 +435,13 @@ def read_light_threshold():
                     lcd.clear()
                     lcd.putstr(val_str)
 
+
 def read_humid_threshold():
-    global start_humid, stop_humid
     lcd.clear()
     lcd.putstr("1:Start 2:Stop")
     while True:
         key = scanKeypad()
-        if key == "1" or key == "2":
+        if key in ["1", "2"]:
             lcd.clear()
             if key == "1":
                 lcd.putstr("Set Start Humid")
@@ -430,12 +455,12 @@ def read_humid_threshold():
                         val = int(val_str)
                         if 0 <= val <= 100:
                             if key == "1":
-                                start_humid = val
+                                data_control[20] = val
                             else:
-                                stop_humid = val
+                                data_control[21] = val
                             lcd.clear()
                             lcd.putstr(f"Value set: {val}")
-                            print(f"{'Start' if key=='1' else 'Stop'} Humid set to {val} lux")
+                            print(f"{'Start' if key=='1' else 'Stop'} Humid set to {val}%")
                             return
                         else:
                             lcd.clear()
@@ -466,7 +491,7 @@ def read_all_sensors():
     temp1, humi1 = parse_two_values(raw1)
     if temp1 is not None:
         print("Temp: {:.1f} °C, Humidity: {:.1f} %".format(temp1, humi1))
-        data_control[0] = str(temp1)
+        data_control[23] = str(temp1)
     else:
         print("Read SN-300-BYH Fail")
     sleep(1)
@@ -478,23 +503,26 @@ def read_all_sensors():
     temp2, humi2, ec2 = parse_three_values(raw2)
     if temp2 is not None:
         print("Temp: {:.1f} °C, Humidity: {:.1f} %, EC: {:.1f} mS/cm".format(temp2, humi2, ec2))
+        data_control[24] = str(humi2)
     else:
         print("Read SN-3000-ECTH Fail")
     sleep(1)
+    file_operation('w')
 
     req_light = [7, 3, 0x01, 0xFA, 0x00, 0x02]
     raw3 = send_modbus_request(req_light)
     light_value = parse_light_data(raw3)
     if light_value is not None:
         print("Light Intensity:", light_value)
+        data_control[25] = str(light_value)
     else:
         print("Read PR-300BYH-LUX Fail")
     sleep(3)
-    
+    file_operation('w')
+
     return temp1,humi1,light_value,humi2
 
 def show_start_stop(idx_threshold, idx_time):
-    
     lcd.clear()
     lcd.putstr("Start threshold: " + str(data_control[idx_threshold]))
     lcd.move_to(0, 1)
@@ -554,24 +582,30 @@ def show_wifi_info():
     
 
 def operation_esp32_comm():
-    global pumpState,motorState
     lcd.clear()
-    lcd.putstr("Select:1-14")
+    lcd.putstr("Select Menu (1-20): ")
+    lcd.move_to(0,1)
     while True:
-        key = scan_keypad()
+        key = read_multi_digit(max_value=20, x=3, y=1)  
         if not key:
             return
+
         if key == '1': #show date
             datetime1 = ds.datetime()   #(year, month, mday, weekday, hour, minute, second, 0)        
             lcd.putstr("Date:")            
-            Date_str = str(datetime1[0]) + ":" + str(datetime1[1]) + ":" + str(datetime1[2]) + ":" + date1[datetime1[3]-1]
+            Date_str = str(datetime1[0]) + "/" + str(datetime1[1]) + "/" + str(datetime1[2]) + "/" + date1[datetime1[3]-1]
             lcd.move_to(0,1)
             lcd.putstr(Date_str)
         elif key == '2':
-            #set set
+            #set date
             exitfunction()
         elif key == '3':
             #show time
+            datetime1 = ds.datetime()   #(year, month, mday, weekday, hour, minute, second, 0)        
+            lcd.putstr("Date:")            
+            Time_str = str(datetime1[4]) + ":" + str(datetime1[5]) + ":" + str(datetime1[6])
+            lcd.move_to(0,1)
+            lcd.putstr(Time_str)
             exitfunction()
         elif key == '4':
             #set time
@@ -607,10 +641,14 @@ def operation_esp32_comm():
             select_control_mode_pump()
             exitfunction()
         elif key == '13':
-            motorState = not motorState
+            file_operation('r')
+            data_control[15] = not data_control[15]
+            file_operation('w')
             exitfunction()
         elif key == '14':
-            pumpState = not pumpState
+            file_operation('r')
+            data_control[17] = not data_control[17]
+            file_operation('w')
             exitfunction()
         elif key == '15':
             check_dev_status()
@@ -618,16 +656,20 @@ def operation_esp32_comm():
         elif key == '16':
             read_light_threshold()
             exitfunction()
-        elif key == '17':
+        elif key == '17':#set time start light
+            
+            exitfunction()
+        elif key == '18':
             read_humid_threshold()
             exitfunction()
-        elif key == '18':#show start time light
+        elif key == '19':#set time start humid
+
+            exitfunction()
+        elif key == '20':#show start time light
             show_start_stop(18, 1)
             exitfunction()
-        elif key == '19':#show start time humid
+        elif key == '21':#show start time humid
             show_start_stop(20, 8)
-            exitfunction()
-        elif key == '20':
             exitfunction()
         else:
             lcd.clear()
