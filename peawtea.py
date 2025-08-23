@@ -198,11 +198,11 @@ def operation_web_comm():
         
     elif command_str[0] == 'K':  
         file_operation('r')
-        web_str = 'K,' + data_control[20] + "," + data_control[21] + "," + data_control[8] + "," + data_control[9] + "," + data_control[10] + "," + data_control[11] + "," + data_control[12] + "," + data_control[13] + "," + data_control[20] 
+        web_str = 'K,' + data_control[20] + "," + data_control[21] + "," + data_control[8] + "," + data_control[9] + "," + data_control[10] + "," + data_control[11] + "," + data_control[12] + "," + data_control[13] + "," + data_control[22] 
     
     elif command_str[0] == 'L':  
         web_str = command_str.split(",")
-        data_control[20] = web_str[1]
+        data_control[22] = web_str[1]
         file_operation('w')
         web_str = "OK!"
         
