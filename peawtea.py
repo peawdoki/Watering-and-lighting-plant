@@ -75,12 +75,11 @@ def operation_web_comm():
     if not command_str:
         return None
 
-    # ===== Date/Time (ต้องมี ds และ set_time ในโปรเจกต์) =====
-    if command_str[0] == '1':  # read date
-        datetime1 = ds.datetime()   # (year, month, mday, weekday, hour, minute, second, 0)
+    if command_str[0] == '1': 
+        datetime1 = ds.datetime()   
         web_str = '1,' + str(datetime1[0]) + "," + str(datetime1[1]) + "," + str(datetime1[2]) + "," + str(datetime1[3])
 
-    elif command_str[0] == '2':  # set date
+    elif command_str[0] == '2':  
         web_str = command_str.split(",")
         time_value = ds.datetime()
         time_list = list(time_value)
@@ -89,13 +88,13 @@ def operation_web_comm():
         set_time(time_list)
         web_str = "OK!"
 
-    elif command_str[0] == '3':  # read time
+    elif command_str[0] == '3':  
         datetime1 = ds.datetime()
         web_str = '3'
         for i in range(4, 7):
             web_str = web_str + ',' + str(datetime1[i])
 
-    elif command_str[0] == '4':  # set time
+    elif command_str[0] == '4':  
         web_str = command_str.split(",")
         time_value = ds.datetime()
         time_list = list(time_value)
@@ -104,67 +103,67 @@ def operation_web_comm():
         set_time(time_list)
         web_str = "OK!"
 
-    # ===== Wi-Fi show/change =====
-    elif command_str[0] == '5':  # Show wifi
+    elif command_str[0] == '5': 
         file_operation('r')
         web_str = '5,' + data_control[27] + "," + data_control[28]
         
-    elif command_str[0] == '6':  # Change wifi
+    elif command_str[0] == '6': 
         web_str = command_str.split(",")
         data_control[27] = web_str[1]
         data_control[28] = web_str[2]
         file_operation('w')
         web_str = "OK!"
+  
     elif command_str[0] == '7':   
         connect_wifi()
         web_str = "OK!"
 
-    # ===== Device control/status (ต้องมี devs เป็น list ของ Pin) =====
-    elif command_str[0] == '8':  # Dev ON/OFF
+
+    elif command_str[0] == '8':  
         file_operation('r')
         web_str = '8,' + data_control[23] + "," + data_control[24] + "," + data_control[26] + "," + data_control[25]
 
-    elif command_str[0] == '9':  # Dev Status
+    elif command_str[0] == '9':  
         file_operation('r')
         web_str = '9,' + data_control[0] + "," + data_control[7]
 
-    # ===== Power / Control flags =====
-    elif command_str[0] == 'A':  # Show Power
+
+    elif command_str[0] == 'A': 
         web_str = command_str.split(",")
         data_control[0] = web_str[1]
         file_operation('w')
         web_str = "OK!"
 
-    elif command_str[0] == 'B':  # Control ON/OFF
+    elif command_str[0] == 'B':  
         web_str = command_str.split(",")
         data_control[7] = web_str[1]
         file_operation('w')
         web_str = "OK!"
 
-    elif command_str[0] == 'C':  # Show Control Status
+    elif command_str[0] == 'C':  
         web_str = command_str.split(",")        
         data_control[15] = web_str[1]
         file_operation('w')
         web_str = "OK!"
 
-    elif command_str[0] == 'D':  # Set Con Value (timer block 8 ช่อง)
+    elif command_str[0] == 'D': 
         web_str = command_str.split(",")        
         data_control[17] = web_str[1]
         file_operation('w')
         web_str = "OK!"
 
-    elif command_str[0] == 'E':  # Show Con Value
+    elif command_str[0] == 'E':  
         file_operation('r')
         web_str = 'E,' + data_control[14] + "," + data_control[16]
         
-    elif command_str[0] == 'F':  # Save Data ON/OFF
+    elif command_str[0] == 'F': 
         web_str = command_str.split(",")
         data_control[18] = web_str[1]
         data_control[19] = web_str[2]
         file_operation('w')
         web_str = "OK!"
 
-    elif command_str[0] == 'G':  # Save Data Status
+    elif command_str[0] == 'G':  
         web_str = command_str.split(",")
         data_control[1] = web_str[1]
         data_control[2] = web_str[2]
@@ -182,7 +181,7 @@ def operation_web_comm():
         file_operation('w')
         web_str = "OK!"
     
-    elif command_str[0] == 'I':  # Save Data Status
+    elif command_str[0] == 'I':  
         web_str = command_str.split(",")
         data_control[8] = web_str[1]
         data_control[9] = web_str[2]
@@ -193,14 +192,20 @@ def operation_web_comm():
         file_operation('w')
         web_str = "OK!"
         
-    elif command_str[0] == 'J':  # Dev ON/OFF
+    elif command_str[0] == 'J':
         file_operation('r')
         web_str = 'J,' + data_control[18] + "," + data_control[19] + "," + data_control[1] + "," + data_control[2] + "," + data_control[3] + "," + data_control[4] + "," + data_control[5] + "," + data_control[26]
         
-    elif command_str[0] == 'K':  # Dev ON/OFF
+    elif command_str[0] == 'K':  
         file_operation('r')
-        web_str = 'K,' + data_control[20] + "," + data_control[21] + "," + data_control[8] + "," + data_control[9] + "," + data_control[10] + "," + data_control[11] + "," + data_control[12] + "," + data_control[13]   
+        web_str = 'K,' + data_control[20] + "," + data_control[21] + "," + data_control[8] + "," + data_control[9] + "," + data_control[10] + "," + data_control[11] + "," + data_control[12] + "," + data_control[13] + "," + data_control[22] 
     
+    elif command_str[0] == 'L':  
+        web_str = command_str.split(",")
+        data_control[22] = web_str[1]
+        file_operation('w')
+        web_str = "OK!"
+        
     else:
         # คำสั่งไม่รู้จัก
         web_str = None
